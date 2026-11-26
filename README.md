@@ -1,39 +1,89 @@
-# LinkSentry
+<div align="center">
+  <img src="public/linksentry-fish.png" width="96" alt="LinkSentry fish and shield logo" />
+  <h1>LinkSentry</h1>
+  <p><strong>Pause before you click. Check the link.</strong></p>
+  <p>A hobby project for checking useful website and domain signals before opening a link.</p>
+  <p>
+    <img src="https://img.shields.io/badge/Next.js-15-black?logo=next.js" alt="Next.js" />
+    <img src="https://img.shields.io/badge/FastAPI-Python-176B4D?logo=fastapi" alt="FastAPI" />
+    <img src="https://img.shields.io/badge/Preview-Docker-2496ED?logo=docker&logoColor=white" alt="Docker" />
+  </p>
+</div>
 
-A first local prototype for checking URL reputation and domain signals. The web interface uses Next.js and TypeScript; the scanner API uses Python and FastAPI.
+---
 
-## Start the scanner API
+## What it does
 
-```bash
-cd scanner
-python -m venv .venv
-# Windows PowerShell: .venv\Scripts\Activate.ps1
-# macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-uvicorn main:app --reload --port 8000
-```
+LinkSentry checks a submitted URL and presents available threat, URL pattern, DNS, hosting, and page signals in one report. An optional isolated browser captures a view-only screenshot.
 
-On Windows, copy `.env.example` to `.env` instead of using `cp`.
+The score is a heuristic signal score, not a probability. A low-risk result does not guarantee a site is safe.
 
-## Start the web app
+## Features
 
-In a second terminal from the project root:
+- Google Safe Browsing checks when configured.
+- Optional VirusTotal lookups use existing reports; new URLs are not submitted.
+- URL pattern checks and public A, AAAA, MX, and NS DNS records.
+- IP registration and network context when available.
+- Page title, metadata, and redirect details when available.
+- Screenshot capture in an isolated Docker browser.
+- Configurable scan rate limiting and short-lived result caching.
 
-```bash
-npm install
-npm run dev
-```
+## Built with
 
-Open `http://localhost:3000`. The scanner API defaults to `http://localhost:8000`; set `NEXT_PUBLIC_SCANNER_API_URL` if it runs elsewhere.
+Next.js, React, TypeScript, shadcn/ui, Python, FastAPI, Playwright, Docker Compose, and a Go proxy.
 
-## Threat reputation
+## Run locally on Windows
 
-Add a VirusTotal API key to `scanner/.env` as `VIRUSTOTAL_API_KEY=...` to enable lookups of existing URL reports. The prototype does not submit new URLs to VirusTotal. Without a key, threat reputation is shown as unavailable and the app returns **Not enough data** unless the URL itself has obvious warning patterns.
+Requirements: Node.js/npm and Python. Docker Desktop is needed for screenshots. Run the web app and scanner in separate PowerShell windows from the project folder.
 
-## Scope and safety
+**Web app**
 
-- The first version does not open or fetch the submitted website. It performs DNS-over-HTTPS queries and optional reputation lookups only.
-- Page titles, redirects, screenshots, certificate details, and IP network/ASN attribution are not implemented yet.
-- A low result means only that the configured checks found no known threat; it is not a guarantee the site is safe.
-- Before public deployment, add rate limits, abuse monitoring, API-key protection, scan quotas, and stricter origin settings. Page inspection should run in a separate locked-down worker/container with outbound-network controls.
+    if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+    npm.cmd install
+    npm.cmd run dev
+
+Open http://localhost:3000.
+
+**Scanner API (second window)**
+
+    Set-Location .\scanner
+    py -m venv .venv
+    .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+    if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+    .\.venv\Scripts\python.exe -m uvicorn main:app --reload --port 8000
+
+Use scanner/.env.example for supported settings. Keep API keys only in local .env files.
+
+**Optional screenshot service:** Start Docker Desktop, set the required private PREVIEW_SERVICE_TOKEN in .preview.env and the matching scanner setting, then run from the project root:
+
+    docker compose --env-file .preview.env -f .\preview\compose.yaml up --build -d
+
+Stop containers with:
+
+    docker compose --env-file .preview.env -f .\preview\compose.yaml down
+
+## Try it
+
+Safe example: https://example.com
+Google Safe Browsing test page: https://testsafebrowsing.appspot.com/s/phishing.html
+
+The Google page is an intentional test. Do not enter information or proceed through browser warnings.
+
+## Safety and privacy
+
+Do not submit private, password-protected, or sensitive URLs. URLs can contain access tokens and may be sent to configured reputation/DNS services and the preview service. Do not use previews for pages requiring your credentials.
+
+Threat feeds can miss new or targeted phishing pages. Review the evidence and do not rely on LinkSentry as your only security control. This is a hobby project, not a production-ready service.
+
+## Project structure
+
+- `src/app` - Next.js pages and styles
+- `src/components` - Header, footer, and UI components
+- `scanner` - FastAPI scanner
+- `preview/proxy` - Go proxy
+- `preview/renderer` - isolated Playwright service
+- `public` - static assets and fish logo
+
+## GitHub
+
+Pushing source code to GitHub does not deploy it by itself. If connected to Vercel, a push may trigger a build or deployment based on Vercel settings. Never commit real .env files or credentials.
