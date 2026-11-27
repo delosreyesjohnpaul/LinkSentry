@@ -8,6 +8,7 @@ import base64
 import ipaddress
 import json
 import os
+from pathlib import Path
 import re
 import socket
 from datetime import datetime, timezone
@@ -15,6 +16,8 @@ from html.parser import HTMLParser
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import httpx
+import html
+import joblib
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,6 +37,10 @@ app.add_middleware(
 
 class ScanRequest(BaseModel):
     url: str = Field(min_length=4, max_length=2048)
+
+class EmailClassificationRequest(BaseModel):
+    subject: str = Field(default="", max_length=500)
+    body: str = Field(default="", max_length=20000)
 
 
 def normalize_url(raw: str) -> tuple[str, str]:
@@ -635,44 +642,6 @@ async def health() -> dict[str, str]:
     return {"status": "ok", "service": "LinkSentry Scanner"}
 
 
-@app.post("/api/preview")
-async def create_preview(request: ScanRequest, http_request: Request) -> dict:
-    url, _ = normalize_url(request.url)
-    token = os.getenv("PREVIEW_SERVICE_TOKEN", "").strip()
-    if not token:
-        raise HTTPException(status_code=503, detail="Website preview is not configured.")
-
-    client_key = http_request.client.host if http_request.client else "unknown"
-    enforce_scan_rate_limit(client_key)
-
-    try:
-        async with httpx.AsyncClient(timeout=32.0, trust_env=False) as client:
-            response = await client.post(
-                "http://127.0.0.1:8001/screenshot",
-                json={"url": url},
-                headers={"Authorization": f"Bearer {token}"},
-            )
-            response.raise_for_status()
-            payload = response.json()
-
-        image = payload.get("image")
-        content_type = payload.get("contentType")
-        if (
-            content_type != "image/jpeg"
-            or not isinstance(image, str)
-            or not image
-            or len(image) > 2_100_000
-        ):
-            raise ValueError("Invalid preview response")
-
-        return {"image": image, "contentType": content_type}
-    except (httpx.HTTPError, ValueError, TypeError):
-        raise HTTPException(
-            status_code=503,
-            detail="Website preview is unavailable. The scan report is unaffected.",
-        )
-
-
 @app.post("/api/scan")
 async def scan(request: ScanRequest, http_request: Request) -> dict:
     url, host = normalize_url(request.url)
@@ -744,3 +713,49 @@ async def scan(request: ScanRequest, http_request: Request) -> dict:
     }
     cache_scan_result(url, result)
     return result
+
+
+_EMAIL_MODEL = None
+_EMAIL_MODEL_PATH = Path(__file__).resolve().parent / "models" / "email_content_model.joblib"
+
+def _get_email_model():
+    global _EMAIL_MODEL
+    if _EMAIL_MODEL is None:
+        if not _EMAIL_MODEL_PATH.exists():
+            raise HTTPException(status_code=503, detail="Email classifier model is not installed.")
+        try:
+            _EMAIL_MODEL = joblib.load(_EMAIL_MODEL_PATH)["model"]
+        except Exception as error:
+            raise HTTPException(status_code=503, detail="Email classifier model could not be loaded.") from error
+    return _EMAIL_MODEL
+
+def _clean_email_text(value: str) -> str:
+    text = html.unescape(value or "")
+    text = re.sub(r"(?i)\\b(?:https?://|www\\.)\\S+", " ", text)
+    text = re.sub(r"<[^>]+>", " ", text)
+    return re.sub(r"\\s+", " ", text).strip()
+
+@app.post("/api/email-classify")
+def classify_email(request: EmailClassificationRequest):
+    text = " ".join(
+        part for part in (
+            _clean_email_text(request.subject),
+            _clean_email_text(request.body),
+        ) if part
+    )
+    if not text:
+        raise HTTPException(status_code=422, detail="Paste an email subject or message body.")
+
+    model = _get_email_model()
+    try:
+        positive_index = list(model.classes_).index(1)
+        phishing_score = float(model.predict_proba([text])[0][positive_index])
+    except Exception as error:
+        raise HTTPException(status_code=503, detail="Email classification failed.") from error
+
+    verdict = "likely_phishing" if phishing_score >= 0.5 else "no_obvious_phishing_signs"
+    return {
+        "verdict": verdict,
+        "phishing_score": round(phishing_score * 100, 1),
+        "note": "This is a content-model estimate, not a guarantee. Review the evidence and verify the sender independently.",
+    }

@@ -1,0 +1,30 @@
+{
+  "dataset": "Nazario_5.csv",
+  "input_fields": [
+    "subject",
+    "body"
+  ],
+  "urls_removed_from_text": true,
+  "label_map": {
+    "0": "legitimate",
+    "1": "phishing"
+  },
+  "rows_after_deduplication": 3046,
+  "class_counts": {
+    "1": 1548,
+    "0": 1498
+  },
+  "holdout_rows": 610,
+  "accuracy": 0.9869,
+  "phishing_precision": 0.9903,
+  "phishing_recall": 0.9839,
+  "phishing_f1": 0.9871,
+  "confusion_matrix_labels": [
+    "actual_legitimate",
+    "actual_phishing"
+  ],
+  "true_legitimate": 297,
+  "legitimate_flagged": 3,
+  "phishing_missed": 5,
+  "phishing_detected": 305
+}

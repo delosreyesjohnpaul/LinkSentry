@@ -1,4 +1,5 @@
 import { ArrowUpRight } from "lucide-react";
+import ThemeToggle from "@/components/theme-toggle";
 
 const navigation = [
   { label: "How it works", href: "#how-it-works" },
@@ -26,6 +27,7 @@ export default function SiteHeader() {
             <span className="site-header__status-dot" />
             Scanner ready
           </span>
+          <ThemeToggle />
           <a className="site-header__action" href="#top">
             Check a link <ArrowUpRight size={15} />
           </a>
