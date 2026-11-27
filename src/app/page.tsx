@@ -6,7 +6,7 @@ import SiteHeader from "@/components/site-header";
 import EmailChecker from "@/components/email-checker";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowDown, ArrowRight, Check, ChevronDown, CircleHelp, Clock3, Copy, ExternalLink, Globe2, LoaderCircle, LockKeyhole, Radar, Shield, ShieldAlert, ShieldCheck, Sparkles, TriangleAlert } from "lucide-react";
+import { ArrowDown, ArrowRight, Check, ChevronDown, CircleHelp, Clock3, Copy, ExternalLink, Globe2, LoaderCircle, LockKeyhole, Mail, Radar, Shield, ShieldAlert, ShieldCheck, Sparkles, TriangleAlert } from "lucide-react";
 
 type ScanReport = {
   url: string; domain: string; risk: "low" | "medium" | "high" | "unknown"; score: number | null;
@@ -18,6 +18,7 @@ const examples = ["https://accounts.google.com", "https://paypal.com", "https://
 
 export default function Home() {
   const [url, setUrl] = useState("");
+  const [scannerMode, setScannerMode] = useState<"url" | "email">("url");
   const [report, setReport] = useState<ScanReport | null>(null);
   const [busy, setBusy] = useState(false);
   const [scanStage, setScanStage] = useState<"signals" | "preview">("signals");
@@ -25,6 +26,14 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [previewState, setPreviewState] = useState<"idle" | "loading" | "ready" | "unavailable">("idle");
+
+  function chooseScanner(mode: "url" | "email") {
+    setScannerMode(mode);
+    setError("");
+    setReport(null);
+    setPreview(null);
+    setPreviewState("idle");
+  }
 
   async function scan(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -112,8 +121,16 @@ export default function Home() {
 
   return <main>
     <SiteHeader />
-    <section className="hero wrap" id="top">
-      <div className="hero-copy"><div className="eyebrow"><span className="eyebrow-dot" /> YOUR FIRST LINE OF DEFENSE</div><h1>Pause before you click,<br /><span>check the link.</span></h1><p className="hero-intro">Get a clear read on suspicious URLs. We check threat reports, DNS, and hosting signals so you can decide what to do next.</p>
+    <section className={`hero wrap ${scannerMode === "email" ? "hero-email-mode" : ""}`} id="top">
+      <div className="hero-copy">
+        <div className="eyebrow"><span className="eyebrow-dot" /> {scannerMode === "url" ? "LINK SECURITY CHECK" : "EMAIL SECURITY CHECK"}</div>
+        <h1>{scannerMode === "url" ? <>Pause before you click,<br /><span>check the link.</span></> : <>Pause before you reply,<br /><span>check the email.</span></>}</h1>
+        <p className="hero-intro">{scannerMode === "url" ? "Check a link for threat reports, DNS, and hosting signals before you decide what to do next." : "Check an email?s wording for phishing clues, then review any links separately."}</p>
+        <div className="scanner-tabs" role="group" aria-label="Choose a scanner">
+          <button type="button" className="scanner-tab" aria-pressed={scannerMode === "email"} onClick={() => chooseScanner("email")}><Mail size={16} /> Email scanner</button>
+          <button type="button" className="scanner-tab" aria-pressed={scannerMode === "url"} onClick={() => chooseScanner("url")}><Globe2 size={16} /> URL scanner</button>
+        </div>
+        {scannerMode === "url" && <>
         <form className="scan-form" onSubmit={scan}><div className="input-wrap"><Globe2 size={19} /><input aria-label="URL to check" value={url} onChange={e => setUrl(e.target.value)} placeholder="Paste a link to check (https://...)" type="text" autoComplete="url" required /></div><button className="scan-button" disabled={busy} aria-busy={busy}>{busy ? <><LoaderCircle className="spin" size={17} /> Checking</> : <>Check link <ArrowRight size={17} /></>}</button></form>
         {busy && <div className="scan-loading" role="status" aria-live="polite">
           <div className="scan-loading-heading">
@@ -140,13 +157,15 @@ export default function Home() {
         {error && <div className="error-box"><TriangleAlert size={16} />{error}</div>}
         <div className="privacy-note"><LockKeyhole size={14} /> The preview visits this public URL in a temporary browser. Do not submit private, sensitive, or password-protected links.</div>
         <div className="try-links"><span>Try an example</span>{examples.map(item => <button type="button" key={item} onClick={() => setUrl(item)}>{item.replace("https://", "")}</button>)}</div>
+        </>}
+        {scannerMode === "email" && <EmailChecker embedded />}
       </div>
-      <div className="hero-art" aria-hidden="true"><div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="orbit orbit-three"/><div className="radar-sweep"/><div className="radar-core"><div className="core-glow"/><ShieldCheck size={48} strokeWidth={1.35}/></div><div className="radar-dot dot-a"/><div className="radar-dot dot-b"/><div className="radar-dot dot-c"/><div className="orbit-label label-a"><span className="mini-check"><Check size={11}/></span> URL reputation</div><div className="orbit-label label-b"><span className="mini-check"><Check size={11}/></span> DNS records</div><div className="orbit-label label-c"><span className="mini-check"><Check size={11}/></span> Hosting signals</div><div className="art-caption"><Radar size={14}/> MULTI-SIGNAL SCAN</div></div>
+      <div className="hero-art" aria-hidden="true"><div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="orbit orbit-three"/><div className="radar-sweep"/><div className="radar-core"><div className="core-glow"/><ShieldCheck size={48} strokeWidth={1.35}/></div><div className="radar-dot dot-a"/><div className="radar-dot dot-b"/><div className="radar-dot dot-c"/><div className="orbit-label label-a"><span className="mini-check"><Check size={11}/></span> {scannerMode === "email" ? "Sender signals" : "URL reputation"}</div><div className="orbit-label label-b"><span className="mini-check"><Check size={11}/></span> {scannerMode === "email" ? "Message content" : "DNS records"}</div><div className="orbit-label label-c"><span className="mini-check"><Check size={11}/></span> {scannerMode === "email" ? "Embedded links" : "Hosting signals"}</div><div className="art-caption"><Radar size={14}/> {scannerMode === "email" ? "EMAIL SIGNAL CHECK" : "MULTI-SIGNAL SCAN"}</div></div>
     </section>
 
-    <EmailChecker />
 
-    {report && <section className="results wrap" aria-live="polite"><div className="results-heading"><div><div className="section-kicker">SCAN REPORT</div><h2>Here’s what we found</h2></div><button className="share-button" onClick={copyReport}>{copied ? <Check size={15}/> : <Copy size={15}/>} {copied ? "Copied" : "Copy summary"}</button></div>
+
+    {report && scannerMode === "url" && <section className="results wrap" aria-live="polite"><div className="results-heading"><div><div className="section-kicker">SCAN REPORT</div><h2>Here’s what we found</h2></div><button className="share-button" onClick={copyReport}>{copied ? <Check size={15}/> : <Copy size={15}/>} {copied ? "Copied" : "Copy summary"}</button></div>
       <div className={`report-card risk-${report.risk}`}><div className="risk-main"><div className="risk-icon">{report.risk === "high" ? <ShieldAlert size={25}/> : report.risk === "low" ? <ShieldCheck size={25}/> : <TriangleAlert size={25}/>}</div><div><div className="risk-overline">OVERALL ASSESSMENT</div><h3>{riskLabel}</h3><p>{report.summary}</p></div></div><div className="risk-score"><div className="score-number">{report.score === null ? "—" : report.score}<span>{report.score === null ? "" : "/100"}</span></div><div className="score-caption">signal score</div></div><div className="report-url"><Globe2 size={16}/><span>{report.domain}</span><a href={report.url} target="_blank" rel="noreferrer noopener" aria-label="Open scanned site"><ExternalLink size={15}/></a><span className="report-time"><Clock3 size={13}/> Just now</span></div></div>
       {nextStep && <div className={`next-step-card ${nextStep.tone}`} role="note">
         <div className="next-step-icon">

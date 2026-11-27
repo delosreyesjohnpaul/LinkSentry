@@ -20,7 +20,7 @@ type EmailResult = {
   skippedLinks: number;
 };
 
-export default function EmailChecker() {
+export default function EmailChecker({ embedded = false }: { embedded?: boolean }) {
   const [emailText, setEmailText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -134,7 +134,7 @@ export default function EmailChecker() {
   }
 
   return (
-    <section className="email-checker wrap" id="email-checker">
+    <section className={`email-checker ${embedded ? "email-checker-embedded" : "wrap"}`} id="email-checker">
       <div className="email-checker-heading">
         <span className="email-checker-icon"><Mail size={19} /></span>
         <div>

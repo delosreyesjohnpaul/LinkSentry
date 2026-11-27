@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { isIP } from "node:net";
 import { NextRequest, NextResponse } from "next/server";
 import chromium from "@sparticuz/chromium-min";
-import puppeteer from "puppeteer-core";
+import puppeteer, { type Browser } from "puppeteer-core";
 import ipaddr from "ipaddr.js";
 
 export const runtime = "nodejs";
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ detail: "Preview limit reached. Please wait a minute before trying again." }, { status: 429, headers: { "Retry-After": "60" } });
   }
 
-  let browser: puppeteer.Browser | undefined;
+  let browser: Browser | undefined;
   try {
     const body = await request.json();
     if (!body || typeof body !== "object") {
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
       // Some sites keep loading; capture the rendered page if the navigation timeout expires.
     }
     await new Promise((resolve) => setTimeout(resolve, 700));
-    const image = await page.screenshot({ type: "jpeg", quality: 70, fullPage: false, timeout: 8_000 });
+    const image = await page.screenshot({ type: "jpeg", quality: 70, fullPage: false });
     if (image.byteLength > MAX_IMAGE_BYTES) {
       return NextResponse.json({ detail: "Preview image was too large." }, { status: 502 });
     }
